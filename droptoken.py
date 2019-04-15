@@ -1,7 +1,37 @@
 import pandas as pd
 import json
 import requests
-#importa dataframe
+#import psycopg2
+import MySQLdb
+
+#correctness
+#testing and #validation, testing verifies that the program is correct
+#test queries separately
+
+#if i care about uptime, then use postgres instead of mysql for backups
+
+# droptoken takes place on a 4x4 grid, a token is dropped along a column and goes to the lowest unoccupied row of the
+# board. A player wins when they have 4 tokens next to ech other either along a row, in a column, or on a diagonal. If
+# the board is filled, and nobody has won, then the game is a draw. Each player takes a turn, starting with player 1,
+# until the game is either a win or a draw. If a player tries to put a token in a column that is already full, that
+# results in an error state, and the player must play again until the play is a valid move.
+
+# This is a data warehouse for stakeholders to answer questions about the droptoken players and games, and generally
+# explore the data.
+
+#columns of the original database are
+# game_id, player_id, move_number, column, result (win, NaN, or draw)
+# db has 145k lines
+
+#a player profile API contains a bunch of json data for each player id, including nationality, with 10 players per page
+# has ~5000 players, 10 per page
+
+#The data warehouse should enable its custoers to easily run the following analysis
+# 1. What is the percentile rank of each column used as the first move in a game?
+# 2. How many games has each nationality participated in?
+# 3. Come up with a list of players that have won a single game, lost a single game, or drew a single game. Send a
+#    different email to each possibility.
+
 
 #note:
 #some data is messy, some of the game_id's are weird strings of values
@@ -15,11 +45,39 @@ import requests
 #things to do: Cache the result of the games/perNation
 #when the players database is updated then
 
+
 #choosing a database
 #relational database, since it's pretty simple and flat
-#RedShift --- $.25/hr ---> 250$/TB/yr
-#PostGreSQL --- Open source
+#pandas --- limit is my memory
+# databases give concurrency, locking, constraints
+#RedShift --- $.25/hr ---> 250$/TB/yr ---> probably much better if I'm scaling to Terabytes that won't fit in memeory
+#PostGreSQL --- Open source, has good documentation, runs slightly faster than pandas when configured correctly
+# as benchmarked by https://medium.com/carwow-product-engineering/sql-vs-pandas-how-to-balance-tasks-between-server-and-client-side-9e2f6c95677
+# harder to scale horizontally than mongodb
+# https://hackr.io/blog/postgresql-vs-mysql has more 'vs' info
 #MySQL --- open source, bought by oracle
+
+
+#postgres it is
+#username: postgres
+#hostname: 127.0.0.0
+#db_name: postgres_db
+
+#mongodb vs postgres for json data
+
+#what are the actual concerns here?
+#does it need to be able to scale to a distributed system? --- No, all of the information can fit on disk
+#note that the entire database can fit in memory
+#how long will each query take?
+#how many queries will happen?
+#will there be caching for the results of the queries?
+#if there is caching for the results of the queries, how do update the cache?
+#do I need to worry about horizontal scaling (more machines) or just vertical scaling (increase memory/ram
+
+
+
+
+#test
 
 
 #there is probably some fancy way of doing this where the analysis class implements some interface
@@ -35,27 +93,166 @@ import requests
 #in case more queries are added... this would mean....?
 #--- a new thing would be added to the interface, and then new implementations for each database
 
-"""class Database:
+#make a bash script
+#fails intelligently
+#chunked intelligently
+
+
+
+#bash script
+#download mysql
+#setup mysql
+#make a virtual env
+#install stuff
+#download requirements
+#upload the data in python or in bash?
+#upload in bash, analysis in python
+
+#alleviate your flinches early --- do something to make it less flinchy
+
+#run script to get json data
+
+#make table of id, nation and put in mysql also
+
+
+
+#put tests in other file
+#is the first query correct
+#is the second query correct
+#is the third query correct
+#use pytest or something more professional
+#check tests with small amount of data
+
+#i have to connect to a specific database
+
+class MySQL:
 
     def __init__(self):
-        pass
-        
+        db = MySQLdb.connect(host="localhost",  # your host, usually localhost
+                             user="root",  # your username
+                             passwd="password",  # your password
+                             db="mydb")
+        #cursor allows execution of queries on db
+        #exectue queries
+        self.connection = db
 
-class Extract:
+    def get_connection(self):
+        return self.connection
 
-    def __init__(self):
-        self.df = self.get_csv()
+    def percentile_rank(self, connection):
 
-    def get_csv(self):
-        df = pd.read_csv('game_data.csv')
-        return df
+        cursor = connection.cursor()
 
-    def construct_game_table(self):
-        games = df.merge()
-        
-"""
+        query = """
+                SELECT column_number, COUNT(result)
+                FROM
+                    (SELECT game_id, column_number
+                    FROM game_data
+                    WHERE move_number=1
+                    ) AS A
+                    JOIN
+                    (SELECT game_id, result
+                    FROM game_data
+                    WHERE result='win'
+                    ) AS B
+                ON A.game_id=B.game_id
+                GROUP BY column_number;
+        """
+        cursor.execute("CREATE TABLE games_won_per_column (column_number INT, games INT);")
+        cursor.execute("INSERT INTO games_won_per_column " + query)
 
-class Analysis:
+        view_query = "SELECT column_number, games/(SELECT SUM(games) from games_won_per_column) as percent_win from games_won_per_column"
+        cursor.execute("CREATE VIEW percentile_column_rank as " +view_query)
+
+        connection.commit()
+
+
+    def create_games_and_players_table(self, connection):
+        try:
+            cursor = connection.cursor()
+            #see if table already exists
+            cursor.execute("SELECT 1 FROM games_and_players LIMIT 1;")
+            return
+        except:
+            #create table
+
+            query = """
+                    INSERT INTO games_and_players
+                        SELECT A.game_id, player1, player2, last_player, result FROM
+                                (SELECT game_id, player_id as player1
+                                FROM game_data
+                                WHERE move_number=1)
+                            AS A
+                            JOIN
+                                (SELECT game_id, player_id as player2
+                                FROM game_data
+                                WHERE move_number=2)
+                            AS B
+                            ON A.game_id=B.game_id
+                            JOIN
+                            (SELECT game_id, player_id as last_player, result
+                                FROM game_data
+                                WHERE result='draw' or result='win'
+                            ) AS C
+                            ON A.game_id=C.game_id
+                    """
+
+
+        #note this part should be in setup, since it is used for multiple queries
+        create_table = "CREATE TABLE games_and_players (game_id varchar(255), player1 INT, player2 INT, last_player INT, result VARCHAR(11))"
+
+        cursor.execute(create_table)
+        cursor.execute(query)
+        connection.commit()
+
+
+    def games_per_nation(self, connection):
+        cursor = connection.cursor()
+        query = """
+                (SELECT nation, COUNT(game_id)
+                FROM games_and_players) as A
+                JOIN
+                apitalbe AS B
+                ON A.player1=B.player_id OR A.player2=B.player_id"""
+        query = "SELECT nation, count(game_id)" \
+                " FROM games_and_players as A " \
+                "JOIN " \
+                "apitable as B" \
+                " ON A.player1=B.player_id OR A.player2=B.player_id;"
+        cursor.execute(query)
+        connection.commit()
+
+    def customizable_email(self, connection):
+        cursor = connection.cursor()
+        disable_only_full_group_by = "SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));"
+        cursor.execute(disable_only_full_group_by)
+
+        query = """
+                    SELECT B.player_id
+                    FROM 
+                        (
+                            SELECT A.* FROM
+	                            (
+	                                (SELECT game_id, player1 as player_id, last_player, result 
+		                            FROM games_and_players 
+		                            GROUP BY player1 
+		                            HAVING count(player1)=1) 
+	                            UNION 
+		                            (SELECT game_id, player2 as player_id, last_player, result 
+		                            FROM games_and_players 
+		                            GROUP BY player2 
+		                            HAVING COUNT(player2)=1)
+	                            ) AS A
+                            GROUP BY A.player_id
+                            HAVING count(A.player_id=1)
+                        ) AS B
+                    WHERE B.result='win' and B.player_id=B.last_player;"""
+
+        cursor.execute(query)
+
+
+
+class Pandas:
 
     #dataframe gets extracted and put into pandas
     def __init__(self, df):
@@ -121,6 +318,7 @@ class Analysis:
         return percentile_wins_per_column.index(max(percentile_wins_per_column)) +1
 
     def create_second_table(self):
+        #creates a table of games, player1, player2, and result
         df = self.df
         moves_1 = df[df.move_number == 1]
         moves_2 = df[df.move_number == 2]
@@ -150,6 +348,8 @@ class Analysis:
                 #make nations dict. Go through player-to-nation db and do nation-to-player*#games = nation-to-games
             #2) make game to player dict (more space)
                 #go through
+        #3 make player-nation table from json, and then do a join, count nations and games
+
         players = {}
         for  index, row in players_and_games.iterrows():
             game_id = row['game_id']
@@ -200,6 +400,7 @@ class Analysis:
 
 
     def games_per_nation2(self):
+        pass
         #begin with dictionary of all ~250 counties w/ count
         #database of players to nation: updated 1/week? or 1/month?
         #when new games are added then do a lookup of the player
@@ -235,12 +436,10 @@ class Analysis:
 
         #filter out players that were only in one game
         one_game_players = {player: game_id for player, game_id in players.items() if game_id is not None}
-        return one_game_players
 
-    def one_game_players2(self):
-        #select unique player1s
-        #select unique player2s
-        pass
+        print(len(one_game_players))
+
+        return one_game_players
 
 
     def customizable_email(self, game_result):
@@ -262,19 +461,38 @@ class Analysis:
             players = [player for player, dict in one_game_players.items()
                        if dict['result'] == 'draw']
             email_content = "email for single-game-draw"
-        print(players)
-        #print(len(df))
-        print(len(one_game_players))
-        print(len(players))
         return players, email_content
 
 
 
 print('running')
 
+#add a csv
+#make a new table
+
+def test01():
+    bla = MySQL()
+    connection = bla.get_connection()
+    bla.percentile_rank(connection)
+    connection.close()
+
+def test02():
+    bla = MySQL()
+    connection = bla.get_connection()
+    bla.create_games_and_players_table(connection)
+    connection.close()
+
+def test03():
+    bla = MySQL()
+    connection = bla.get_connection()
+    bla.create_games_and_players_table(connection)
+    connection.close()
+
+test03()
+
 def test1():
     df = pd.read_csv('~/Projects/droptoken/game_data.csv')
-    x = Analysis(df)
+    x = Pandas(df)
     best_column_to_win = x.best_columnn_to_win()
     print(best_column_to_win)
     print(best_column_to_win == 2)
@@ -282,17 +500,19 @@ def test1():
 def test2():
     #create
     df = pd.read_csv('~/Projects/droptoken/game_data.csv')
-    x = Analysis(df)
+    x = Pandas(df)
     bla = x.games_per_nation()
+    print(x)
+    #print(bla)
 
 def test3():
     #test for winners
     df = pd.read_csv('~/Projects/droptoken/game_data.csv')
-    x = Analysis(df)
+    x = Pandas(df)
     bla = x.customizable_email('win')
     return bla
 
-test2()
+#test3()
 
 #todo
 #nice looking tests
