@@ -5,18 +5,29 @@ FLUSH PRIVILEGES;
 CREATE DATABASE mydb;
 USE mydb;
 
+SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
+
 CREATE TABLE game_data (
 game_id VARCHAR(255),
 player_id INT,
 move_number INT,
 column_number INT,
-RESULT VARCHAR(255)
-);
+result VARCHAR(255));
+
+CREATE TABLE games_won_per_column (
+column_number INT,
+games INT);
+
+CREATE TABLE games_and_players (
+game_id varchar(255),
+player1 INT,
+player2 INT,
+last_player INT,
+result VARCHAR(11));
+
 
 LOAD DATA LOCAL INFILE './game_data.csv'
 INTO TABLE game_data
 FIELDS TERMINATED BY ','
 LINES TERMINATED BY '\n'
 IGNORE 1 ROWS;
-
-SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));

@@ -1,7 +1,5 @@
 import pandas as pd
-import json
 import requests
-#import psycopg2
 import MySQLdb
 
 #correctness
@@ -129,7 +127,7 @@ class MySQL:
 
     def __init__(self):
         db = MySQLdb.connect(host="localhost",  # your host, usually localhost
-                             user="root",  # your username
+                             user="98point6",  # your username
                              passwd="password",  # your password
                              db="mydb")
         #cursor allows execution of queries on db
@@ -139,95 +137,114 @@ class MySQL:
     def get_connection(self):
         return self.connection
 
-    def percentile_rank(self, connection):
-
-        cursor = connection.cursor()
-
-        query = """
-                SELECT column_number, COUNT(result)
-                FROM
-                    (SELECT game_id, column_number
-                    FROM game_data
-                    WHERE move_number=1
-                    ) AS A
-                    JOIN
-                    (SELECT game_id, result
-                    FROM game_data
-                    WHERE result='win'
-                    ) AS B
-                ON A.game_id=B.game_id
-                GROUP BY column_number;
-        """
-        cursor.execute("CREATE TABLE games_won_per_column (column_number INT, games INT);")
-        cursor.execute("INSERT INTO games_won_per_column " + query)
-
-        view_query = "SELECT column_number, games/(SELECT SUM(games) from games_won_per_column) as percent_win from games_won_per_column"
-        cursor.execute("CREATE VIEW percentile_column_rank as " +view_query)
-
-        connection.commit()
+    def is_table_empty(self, tablename, cursor):
+        cursor.execute("SELECT 1 FROM " + tablename + " LIMIT 1;")
+        result = cursor.fetchall()
+        return len(result) == 0
 
 
     def create_games_and_players_table(self, connection):
-        try:
-            cursor = connection.cursor()
-            #see if table already exists
-            cursor.execute("SELECT 1 FROM games_and_players LIMIT 1;")
-            return
-        except:
-            #create table
+
+        cursor = connection.cursor()
+
+        if self.is_table_empty('games_and_players', cursor):
 
             query = """
-                    INSERT INTO games_and_players
-                        SELECT A.game_id, player1, player2, last_player, result FROM
-                                (SELECT game_id, player_id as player1
-                                FROM game_data
-                                WHERE move_number=1)
-                            AS A
+                                INSERT INTO games_and_players
+                                    SELECT A.game_id, player1, player2, last_player, result FROM
+                                            (SELECT game_id, player_id as player1
+                                            FROM game_data
+                                            WHERE move_number=1)
+                                        AS A
+                                        JOIN
+                                            (SELECT game_id, player_id as player2
+                                            FROM game_data
+                                            WHERE move_number=2)
+                                        AS B
+                                        ON A.game_id=B.game_id
+                                        JOIN
+                                        (SELECT game_id, player_id as last_player, result
+                                            FROM game_data
+                                            WHERE result='draw' or result='win'
+                                        ) AS C
+                                        ON A.game_id=C.game_id
+                                """
+
+            cursor.execute(query)
+            connection.commit()
+
+
+    #QUESTION 1
+    def percentile_rank_results(self, connection):
+
+        cursor = connection.cursor()
+
+        if self.is_table_empty("games_won_per_column", cursor):
+
+            query = """
+                    INSERT INTO games_won_per_column 
+                        SELECT column_number, COUNT(result)
+                        FROM
+                            (SELECT game_id, column_number
+                            FROM game_data
+                            WHERE move_number=1
+                            ) AS A
                             JOIN
-                                (SELECT game_id, player_id as player2
-                                FROM game_data
-                                WHERE move_number=2)
-                            AS B
-                            ON A.game_id=B.game_id
-                            JOIN
-                            (SELECT game_id, player_id as last_player, result
-                                FROM game_data
-                                WHERE result='draw' or result='win'
-                            ) AS C
-                            ON A.game_id=C.game_id
-                    """
+                            (SELECT game_id, result
+                            FROM game_data
+                            WHERE result='win'
+                            ) AS B
+                        ON A.game_id=B.game_id
+                        GROUP BY column_number;
+            """
+            cursor.execute(query)
 
+            view_query = """
+                        CREATE VIEW percentile_column_rank AS
+                            SELECT column_number, games/(SELECT SUM(games) FROM games_won_per_column) AS percent_WIN
+                            FROM games_won_per_column
+                        """
+            cursor.execute(view_query)
 
-        #note this part should be in setup, since it is used for multiple queries
-        create_table = "CREATE TABLE games_and_players (game_id varchar(255), player1 INT, player2 INT, last_player INT, result VARCHAR(11))"
+            connection.commit()
 
-        cursor.execute(create_table)
-        cursor.execute(query)
-        connection.commit()
-
-
+    #QUESTION 2
     def games_per_nation(self, connection):
         cursor = connection.cursor()
         query = """
-                (SELECT nation, COUNT(game_id)
-                FROM games_and_players) as A
-                JOIN
-                apitalbe AS B
-                ON A.player1=B.player_id OR A.player2=B.player_id"""
-        query = "SELECT nation, count(game_id)" \
-                " FROM games_and_players as A " \
-                "JOIN " \
-                "apitable as B" \
-                " ON A.player1=B.player_id OR A.player2=B.player_id;"
+                CREATE VIEW games_per_nation AS
+                SELECT nation, COUNT(game_id)
+                FROM 
+                    (games_and_players as A
+                    JOIN
+                    apitable AS B
+                    ON A.player1=B.player_id OR A.player2=B.player_id)
+                GROUP BY nation
+                """
         cursor.execute(query)
+
         connection.commit()
 
-    def customizable_email(self, connection):
+    #QUESTION 3
+    def customizable_email(self, connection, emails):
         cursor = connection.cursor()
-        disable_only_full_group_by = "SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));"
-        cursor.execute(disable_only_full_group_by)
 
-        query = """
+        if emails == "win":
+            view_name = "single_game_player_win"
+            where_clause = "WHERE B.result='win' and B.player_id=B.last_player;"
+        elif emails == "lose":
+            view_name = "single_game_player_lose"
+            where_clause = "WHERE B.result='win' and B.player_id!=B.last_player;"
+        else: #draw
+            view_name = "single_game_player_draw"
+            where_clause = "WHERE B.result='draw'"
+
+
+        # the inner select with the union gets information for players that played one game as player1, or as player2.
+        # the next level select (SELECT A.* from...) removes the info for players that played 1 game as player1 and
+        # as player 2.
+
+        query = "CREATE VIEW " + view_name + """ AS
                     SELECT B.player_id
                     FROM 
                         (
@@ -244,11 +261,23 @@ class MySQL:
 		                            HAVING COUNT(player2)=1)
 	                            ) AS A
                             GROUP BY A.player_id
-                            HAVING count(A.player_id=1)
-                        ) AS B
-                    WHERE B.result='win' and B.player_id=B.last_player;"""
+                            HAVING COUNT(A.player_id)=1
+                        ) AS B """+ where_clause
 
+        print(query)
         cursor.execute(query)
+        connection.commit()
+
+    #QUESTION 3
+    def create_views_for_3_questions(self):
+        connection = self.get_connection()
+        #question 1
+        self.percentile_rank(connection)
+        #question 2
+        self.create_games_and_players_table(connection)
+        self.games_per_nation(connection)
+        #question 3
+        self.customizable_email(connection)
 
 
 
@@ -396,22 +425,6 @@ class Pandas:
         #return games per nation
         return nations
 
-
-
-
-    def games_per_nation2(self):
-        pass
-        #begin with dictionary of all ~250 counties w/ count
-        #database of players to nation: updated 1/week? or 1/month?
-        #when new games are added then do a lookup of the player
-
-
-        #same game, p1, p2, then nation to # players, where number of players is done via looking up player
-        #players that were added since the past update go in a special queue
-        #look at those in the special queue first, and ten before the weekly database update
-        #IF I knew that the most recent updates were made to either the end page or the beginning page
-            #THEN keep a dictionary of the last time the database was updated
-
     def one_game_players(self):
         #return players with one game
 
@@ -463,7 +476,14 @@ class Pandas:
             email_content = "email for single-game-draw"
         return players, email_content
 
-
+def cli(args):
+    if len(args) == 0:
+        #do default behavior
+        pass
+    elif args:
+        pass
+    else:
+        pass
 
 print('running')
 
@@ -485,10 +505,14 @@ def test02():
 def test03():
     bla = MySQL()
     connection = bla.get_connection()
-    bla.create_games_and_players_table(connection)
+    bla.customizable_email(connection, "win")
+    bla.customizable_email(connection,"lose")
+    bla.customizable_email(connection, "draw")
     connection.close()
 
 test03()
+
+#test03()
 
 def test1():
     df = pd.read_csv('~/Projects/droptoken/game_data.csv')
