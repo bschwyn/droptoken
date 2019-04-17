@@ -2,11 +2,6 @@ import pandas as pd
 import requests
 import MySQLdb
 
-#correctness
-#testing and #validation, testing verifies that the program is correct
-#test queries separately
-
-#if i care about uptime, then use postgres instead of mysql for backups
 
 # droptoken takes place on a 4x4 grid, a token is dropped along a column and goes to the lowest unoccupied row of the
 # board. A player wins when they have 4 tokens next to ech other either along a row, in a column, or on a diagonal. If
@@ -16,6 +11,13 @@ import MySQLdb
 
 # This is a data warehouse for stakeholders to answer questions about the droptoken players and games, and generally
 # explore the data.
+
+
+#correctness
+#testing and #validation, testing verifies that the program is correct
+#test queries separately
+
+#if i care about uptime, then use postgres instead of mysql for backups
 
 #columns of the original database are
 # game_id, player_id, move_number, column, result (win, NaN, or draw)
@@ -151,23 +153,23 @@ class MySQL:
 
             query = """
                                 INSERT INTO games_and_players
-                                    SELECT A.game_id, player1, player2, last_player, result FROM
+                                    SELECT first_player_is_p1.game_id, player1, player2, last_player, result FROM
                                             (SELECT game_id, player_id as player1
                                             FROM game_data
                                             WHERE move_number=1)
-                                        AS A
+                                        AS first_player_is_p1
                                         JOIN
                                             (SELECT game_id, player_id as player2
                                             FROM game_data
                                             WHERE move_number=2)
-                                        AS B
-                                        ON A.game_id=B.game_id
+                                        AS first_player_is_p2
+                                        ON first_player_is_p1.game_id=first_player_is_p2.game_id
                                         JOIN
                                         (SELECT game_id, player_id as last_player, result
                                             FROM game_data
                                             WHERE result='draw' or result='win'
-                                        ) AS C
-                                        ON A.game_id=C.game_id
+                                        ) AS final_move
+                                        ON first_player_is_p1.game_id=final_move.game_id
                                 """
 
             cursor.execute(query)
@@ -188,13 +190,13 @@ class MySQL:
                             (SELECT game_id, column_number
                             FROM game_data
                             WHERE move_number=1
-                            ) AS A
+                            ) AS first_move
                             JOIN
                             (SELECT game_id, result
                             FROM game_data
                             WHERE result='win'
-                            ) AS B
-                        ON A.game_id=B.game_id
+                            ) AS winning_move
+                        ON first_move.game_id=winning_move.game_id
                         GROUP BY column_number;
             """
             cursor.execute(query)
@@ -211,23 +213,31 @@ class MySQL:
     #QUESTION 2
     def games_per_nation(self, connection):
         cursor = connection.cursor()
-        query = """
-                CREATE VIEW games_per_nation AS
-                SELECT nation, COUNT(game_id)
-                FROM 
-                    (games_and_players as A
-                    JOIN
-                    apitable AS B
-                    ON A.player1=B.player_id OR A.player2=B.player_id)
-                GROUP BY nation
-                """
-        cursor.execute(query)
 
-        connection.commit()
+        #check and see if games_and_players does not exist yet, then create it
+        self.create_games_and_players_table(connection)
+
+        if self.is_table_empty('games_per_nation', cursor):
+            query = """
+                    CREATE VIEW games_per_nation AS
+                    SELECT nation, COUNT(game_id)
+                    FROM 
+                        (games_and_players as A
+                        JOIN
+                        apitable AS B
+                        ON A.player1=B.player_id OR A.player2=B.player_id)
+                    GROUP BY nation
+                    """
+            cursor.execute(query)
+
+            connection.commit()
 
     #QUESTION 3
     def customizable_email(self, connection, emails):
         cursor = connection.cursor()
+
+        #check and see if games_and_players table does not exist, then create it
+        self.create_games_and_players_table(connection)
 
         if emails == "win":
             view_name = "single_game_player_win"
@@ -239,34 +249,44 @@ class MySQL:
             view_name = "single_game_player_draw"
             where_clause = "WHERE B.result='draw'"
 
+        if self.is_table_empty(view_name, cursor):
 
-        # the inner select with the union gets information for players that played one game as player1, or as player2.
-        # the next level select (SELECT A.* from...) removes the info for players that played 1 game as player1 and
-        # as player 2.
+            query = "CREATE VIEW " + view_name + """ AS
+            
+                        /*given the game information for players that played a single game, the win/loss/draw statement
+                        is selected from this*/
+                        
+                        
+                        SELECT B.player_id
+                        FROM 
+                            (
+                                
+                            /* The innermost union query selects game information for players that played one game
+                            as player1 and players that played one game as player2. Since it is possible that a 
+                            player could play one game as player1 and and another game as player2, to get only the game
+                            info for players of a single game (excusively as player 1 or player2), we have the second
+                            'select A.*' statement.*/
+                                
+                                SELECT A.* FROM
+                                
+                                
+                                    (
+                                        (SELECT game_id, player1 as player_id, last_player, result 
+                                        FROM games_and_players 
+                                        GROUP BY player1 
+                                        HAVING count(player1)=1) 
+                                    UNION 
+                                        (SELECT game_id, player2 as player_id, last_player, result 
+                                        FROM games_and_players 
+                                        GROUP BY player2 
+                                        HAVING COUNT(player2)=1)
+                                    ) AS A
+                                GROUP BY A.player_id
+                                HAVING COUNT(A.player_id)=1
+                            ) AS B """+ where_clause
 
-        query = "CREATE VIEW " + view_name + """ AS
-                    SELECT B.player_id
-                    FROM 
-                        (
-                            SELECT A.* FROM
-	                            (
-	                                (SELECT game_id, player1 as player_id, last_player, result 
-		                            FROM games_and_players 
-		                            GROUP BY player1 
-		                            HAVING count(player1)=1) 
-	                            UNION 
-		                            (SELECT game_id, player2 as player_id, last_player, result 
-		                            FROM games_and_players 
-		                            GROUP BY player2 
-		                            HAVING COUNT(player2)=1)
-	                            ) AS A
-                            GROUP BY A.player_id
-                            HAVING COUNT(A.player_id)=1
-                        ) AS B """+ where_clause
-
-        print(query)
-        cursor.execute(query)
-        connection.commit()
+            cursor.execute(query)
+            connection.commit()
 
     #QUESTION 3
     def create_views_for_3_questions(self):
