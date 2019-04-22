@@ -90,3 +90,21 @@ A solution for the query time was necessary, so I elected to download the player
 One possibility was to put the json data directly into MySQL, however if there were missing fields in the json data this could cause errors in queries.
 
 I think it is better to extract the desired fields from the json and do any transformation or cleaning of it before putting it into MySQL, though I would be interested in hearing the opinions of other engineers on this.
+
+### Future Work
+
+Errors:
+
+One of the things that I do not know much about best practices for, is what to do with errors, and the replacement of 
+data w/ errors. Some of the game_ids in the droptoken dataset are strings of characters, rather than numbers. Given the data, it would be possible to write a function that figures out the correct game_id based off of it's relative numerical position compared to other data. (i.e. go back to the previous numbered gameid and increment it to get the right one). In this case it seems quite easy to find the correct data from the error-filled data. However, if, say, column_number was incorrect, it would be quite difficult to figure out.
+
+It seems likely that cleaning of the data would need to be handled on a case by case basis. It also needs to be decided whether to handle this before, during, or after the upload of the data, as the types in the database tables are set.
+
+Uploading data:
+
+In a working system, presumably the games are coming from somewhere and database updates need to occur. Perhaps we can talk about this!
+
+Tests:
+
+I would have liked to get a module working that mocked out database functions.
+Many of the tests that I did while creating the queries were 'order of magnitude / ballpark' tests. I would have liked to write these up. 

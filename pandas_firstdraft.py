@@ -198,3 +198,28 @@ class Pandas:
                        if dict['result'] == 'draw']
             email_content = "email for single-game-draw"
         return players, email_content
+
+
+
+#tests
+def p1():
+    df = pd.read_csv('~/Projects/droptoken/game_data.csv')
+    x = Pandas(df)
+    best_column_to_win = x.best_columnn_to_win()
+    print(best_column_to_win)
+    print(best_column_to_win == 2)
+
+def p2():
+    #create
+    df = pd.read_csv('~/Projects/droptoken/game_data.csv')
+    x = Pandas(df)
+    bla = x.games_per_nation()
+    print(x)
+    #print(bla)
+
+def p3():
+    #test for winners
+    df = pd.read_csv('~/Projects/droptoken/game_data.csv')
+    x = Pandas(df)
+    bla = x.customizable_email('win')
+    return bla
