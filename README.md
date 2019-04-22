@@ -64,13 +64,12 @@ After all of the queries are run, the view names can be accessed by:
 To run tests, run:
 
 ```pytest```
-
+or
+```pytest droptoken.py```
 
 
 
 ### Database Choice
-
-For an initial test run I used the python library Pandas.
 
 There were several considerations in my choice of database:
 - The first consideration was whether to use a relational database or not. Speed, while a consideration, was not of p
