@@ -1,6 +1,6 @@
 
 import requests
-import MySQLdb #mysqlclient
+import MySQLdb
 import sys
 
 def upload_to_database(cursor, id,nation):
@@ -9,26 +9,35 @@ def upload_to_database(cursor, id,nation):
     cursor.execute(query)
 
 def parse_json_and_upload(json_array, cursor):
-    for object in json_array:  #10 objects
-        id = object['id']
-        nat = object['data']['nat']
-        upload_to_database(cursor, id, nat)
+    for object in json_array:  #10 objects per array
+        try:
+            id = object['id']
+            nat = object['data']['nat']
+            upload_to_database(cursor, id, nat)
+        except KeyError as e:
+            #logging missing data could be important
+            print(e, file=sys.stderr)
 
 def get_data_from_api(cursor):
     params = {'Accept': 'application/json'}
     url = 'https://x37sv76kth.execute-api.us-west-1.amazonaws.com/prod/users?page='
     page = 0
     r = requests.get(url=url + str(page), params=params)
-    # iterate through entire json player library thing (should take approx 5 minutes)
+
+    # iterate through all api pages (approx ~500 at current time)
     json_array = r.json()
     while json_array:  # while json is not empty...
         parse_json_and_upload(json_array, cursor)
         page += 1
-        r = requests.get(url=url + str(page), params=params)
-        json_array = r.json()
+        try:
+            r = requests.get(url=url + str(page), params=params)
+        except requests.exceptions.RequestException as e:
+            print(e, file=sys.stderr)
 
-def create_table(cursor):
-    cursor.execute("CREATE TABLE apitable (player_id INT, nation VARCHAR(255));")
+            # In a fully automated system, I will want to handle connection errors, http errors, timeouts,
+            # and do retries on connection failures
+
+        json_array = r.json()
 
 def main():
     db_connection = MySQLdb.connect(host="localhost",  # your host, usually localhost
@@ -36,7 +45,6 @@ def main():
                                     passwd="password",  # your password
                                     db="mydb")
     cursor = db_connection.cursor()
-    create_table(cursor)
     get_data_from_api(cursor)
     db_connection.commit()
 

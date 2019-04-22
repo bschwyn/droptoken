@@ -25,6 +25,10 @@ player2 INT,
 last_player INT,
 result VARCHAR(11));
 
+CREATE TABLE apitable (
+player_id INT,
+nation VARCHAR(255));
+
 
 LOAD DATA LOCAL INFILE './game_data.csv'
 INTO TABLE game_data
