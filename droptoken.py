@@ -105,9 +105,7 @@ class MySQL:
         #check and see if games_and_players does not exist yet, then create it
         self.populate_games_and_players_table(connection)
 
-        print("aj;falskdj;falkdj;f", sys.stderr)
         if self.is_table_empty('games_per_nation', cursor):
-            print("aj;falskdj;falkdj;f", sys.stderr)
             query = """
                     CREATE VIEW games_per_nation AS
                     SELECT nation, COUNT(game_id)
@@ -191,8 +189,6 @@ class MySQL:
             self.customizable_email(connection, email_type)
 
 
-
-
 def main():
 
     db = MySQL()
@@ -200,7 +196,7 @@ def main():
 
     args = sys.argv[1:]
     if len(args) == 0:
-        db.create_views_for_3_questions(connection)
+        db.create_views_for_3_questions()
 
     #check if number in cli
     if '1' in str(args):

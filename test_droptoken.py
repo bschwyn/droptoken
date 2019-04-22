@@ -21,20 +21,29 @@ def test_db_connectivity():
     assert connection
 
 
+
+#order of magnitude tests
+
+# percentage points should add up to 1.0
+
+# since there are 10k games total, there are 20k "sides" of games. Assuming no nation plays itself, there should be 20k total games.
+
+# approx 50% of all the games are draws, there is a similar ratio for all the games and the smaller selection of games
+# by players who only played one game. the winners/losers are roughly 50/50 player 1 or player 2 for both.
+
+#running tests
+
 def test_question1():
     db = MySQL()
     connection = db.get_connection()
     db.percentile_rank(connection)
     connection.close()
-    cursor = db.cursor()
-    results = cursor.fetchone()
 
 def test_question2():
     db = MySQL()
     connection = db.get_connection()
     db.games_per_nation(connection)
     connection.close()
-
 
 def test03():
     db = MySQL()
@@ -44,9 +53,4 @@ def test03():
     db.customizable_email(connection, "draw")
     connection.close()
 
-
-#order of magnitude tests
-
-# percentage points should add up to 1.0
-# since there are 10k games total, there are 20k "sides" of games. Assuming no nation plays itself, there should be 20k total games.
-# there are approximately 50%
+#db mock tests

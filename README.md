@@ -3,12 +3,7 @@
 
 ### Introduction
 
-
-Droptoken takes place on a 4x4 grid, a token is dropped along a column and goes to the lowest unoccupied row of the
-board. A player wins when they have 4 tokens next to ech other either along a row, in a column, or on a diagonal. If
-the board is filled, and nobody has won, then the game is a draw. Each player takes a turn, starting with player 1,
-until the game is either a win or a draw. If a player tries to put a token in a column that is already full, that
-results in an error state, and the player must play again until the play is a valid move.
+This is my work sample for 98point6! It has a MySQL database that contains moves and other information for the connect-4 like game "droptoken".
 
 ### Installation and Setup
 
@@ -39,21 +34,30 @@ To create views for all of the questions, run:
 
 ```python droptoken.py```
 
-or
-
-```python droptoken.py -123```
 
 Views for the questions can be created individually by including the question number as a command line argument
 
+For example:
 
-```python droptoken.py -1 -2``` or ```python droptoken.py -12```  to create views for questions 1 and 2
+```python droptoken.py -1 -2``` or ```python droptoken.py -12``` 
+
+to create views for questions 1 and 2.
+
+A reminder:
+- Question 1 is about 'what is the percent rank of each column used as the first move of the game?'
+- Question 2 is 'how many games did each nation play'
+- Question 3 is 'create a list of players that played a single game that they either won, lost or drew' 
 
 For question 3, if you want to create a view for only one outcome, then include which type in the CLI, for example: 
 ```python droptoken -3 win``` 
 
 ### Views
 
-After all of the queries are run, the view names can be accessed
+After all of the queries are run, the view names can be accessed by:
+
+- Q1: games_won_per_column or percentile_column_rank
+- Q2: games_per_nation
+- Q3: single_player_game_win, single_player_game_lose, single_player_game_draw
 
 ### Testing
 
@@ -106,5 +110,9 @@ In a working system, presumably the games are coming from somewhere and database
 
 Tests:
 
-I would have liked to get a module working that mocked out database functions.
-Many of the tests that I did while creating the queries were 'order of magnitude / ballpark' tests. I would have liked to write these up. 
+I would have liked to get a module working that mocked out database functions. This would have allowed me to run the same functions on simple data sets that were hand-verifiable.
+Many of the tests that I did while creating the queries were 'order of magnitude / ballpark' tests. I would have liked to write these up.
+
+Automation:
+
+There may be some errors here, or lack of flexibility if something failes. I also expect that there  are better ways of doing this, such as dedicated config files.
