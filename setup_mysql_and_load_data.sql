@@ -2,8 +2,8 @@ CREATE USER '98point6'@'localhost' IDENTIFIED BY 'password';
 GRANT ALL PRIVILEGES ON *.* TO '98point6'@'localhost';
 FLUSH PRIVILEGES;
 
-CREATE DATABASE mydb;
-USE mydb;
+CREATE DATABASE benschwyn_droptoken;
+USE benschwyn_droptoken;
 
 SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
 

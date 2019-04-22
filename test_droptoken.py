@@ -19,12 +19,11 @@ def testtest():
     assert 1 == 1
 
 def test_db_connectivity():
-    print('alkfj;alkdfj;aldkfja;')
     try:
         db = MySQLdb.connect(host="localhost",  # your host, usually localhost
                              user="98point6",  # your username
                              passwd="password",  # your password
-                             db="mydb")
+                             db="benschwyn_droptoken")
         cursor = db.cursor()
         cursor.execute("SELECT VERSION()")
         results = cursor.fetchone()

@@ -14,7 +14,7 @@ class MySQL:
         db = MySQLdb.connect(host="localhost",  # your host, usually localhost
                              user="98point6",  # your username
                              passwd="password",  # your password
-                             db="mydb")
+                             db="benschwyn_droptoken")
         #cursor allows execution of queries on db
         #exectue queries
         self.connection = db
@@ -23,13 +23,13 @@ class MySQL:
         return self.connection
 
     def is_table_empty(self, tablename, cursor):
-        cursor.execute("SELECT 1 FROM " + tablename + " LIMIT 1;")
-        result = cursor.fetchall()
-        return len(result) == 0
-
-    def does_view_exist(self, viewname, cursor):
-        cursor.execute()
-
+        try:
+            cursor.execute("SELECT 1 FROM " + tablename + " LIMIT 1;")
+            result = cursor.fetchall()
+            return len(result) == 0 #if empty return true
+        except Exception :
+            #table does not exist
+            return True
 
     def populate_games_and_players_table(self, connection):
 
@@ -105,7 +105,9 @@ class MySQL:
         #check and see if games_and_players does not exist yet, then create it
         self.populate_games_and_players_table(connection)
 
+        print("aj;falskdj;falkdj;f", sys.stderr)
         if self.is_table_empty('games_per_nation', cursor):
+            print("aj;falskdj;falkdj;f", sys.stderr)
             query = """
                     CREATE VIEW games_per_nation AS
                     SELECT nation, COUNT(game_id)
@@ -138,7 +140,7 @@ class MySQL:
             where_clause = "WHERE B.result='draw'"
 
 
-        if self.does_view_exist(view_name, cursor):
+        if self.is_table_empty(view_name, cursor):
 
             query = "CREATE VIEW " + view_name + """ AS
             

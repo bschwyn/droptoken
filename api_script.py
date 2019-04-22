@@ -43,7 +43,7 @@ def main():
     db_connection = MySQLdb.connect(host="localhost",  # your host, usually localhost
                                     user="98point6",  # your username
                                     passwd="password",  # your password
-                                    db="mydb")
+                                    db="benschwyn_droptoken")
     cursor = db_connection.cursor()
     get_data_from_api(cursor)
     db_connection.commit()

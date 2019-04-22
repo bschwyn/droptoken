@@ -51,6 +51,10 @@ Views for the questions can be created individually by including the question nu
 For question 3, if you want to create a view for only one outcome, then include which type in the CLI, for example: 
 ```python droptoken -3 win``` 
 
+### Views
+
+After all of the queries are run, the view names can be accessed
+
 ### Testing
 
 To run tests, run:
