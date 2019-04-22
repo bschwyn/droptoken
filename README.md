@@ -3,7 +3,8 @@
 
 ### Introduction
 
-This is my work sample for 98point6! It has a MySQL database that contains moves and other information for the connect-4 like game "droptoken".
+This is my work sample for 98point6! 
+It has a MySQL database that contains moves and other information for the connect-4 like game "droptoken" after setup.  You can then run queries on the database and look at the results in views.
 
 ### Installation and Setup
 
